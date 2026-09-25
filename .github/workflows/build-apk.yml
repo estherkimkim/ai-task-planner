@@ -1,4 +1,4 @@
-name: Build Android APK v5
+name: Build Android APK v8
 
 on:
   workflow_dispatch:
@@ -28,17 +28,19 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Unpack Android project v5
+      - name: Unpack Android project v8
         run: |
           rm -rf appsrc
           mkdir appsrc
-          unzip -q "android-project-v5.zip" -d appsrc
+          unzip -q "android-project-v8.zip" -d appsrc
 
-      - name: Verify v5 source
+      - name: Verify v8 source
         run: |
-          grep -q 'versionCode 5' appsrc/app/build.gradle
-          grep -q 'public String geminiGenerate' appsrc/app/src/main/java/com/aitaskplanner/app/MainActivity.java
-          grep -q '빌드 Android v5 · DB/Gemini 통합 수정판' appsrc/app/src/main/assets/index.html
+          grep -q 'versionCode 8' appsrc/app/build.gradle
+          grep -q '빌드 Android v8 · 사용성/데이터 안정화판' appsrc/app/src/main/assets/index.html
+          grep -q 'public void saveBackup' appsrc/app/src/main/java/com/aitaskplanner/app/MainActivity.java
+          grep -q 'class DailyRefreshReceiver' appsrc/app/src/main/java/com/aitaskplanner/app/DailyRefreshReceiver.java
+          grep -q 'Notification.BigTextStyle' appsrc/app/src/main/java/com/aitaskplanner/app/TaskNotificationService.java
 
       - name: Keep signing key
         uses: actions/cache@v4
@@ -54,12 +56,11 @@ jobs:
         run: gradle --no-daemon assembleDebug
 
       - name: Verify APK
-        run: |
-          test -f appsrc/app/build/outputs/apk/debug/app-debug.apk
+        run: test -f appsrc/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Task-Planner-v5-APK
+          name: AI-Task-Planner-v8-APK
           path: appsrc/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
