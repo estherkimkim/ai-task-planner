@@ -1,4 +1,4 @@
-name: Build Android APK v4
+name: Build Android APK v5
 
 on:
   workflow_dispatch:
@@ -25,19 +25,20 @@ jobs:
           packages: ''
 
       - name: Install Android SDK packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Unpack Android project v4
+      - name: Unpack Android project v5
         run: |
           rm -rf appsrc
           mkdir appsrc
-          unzip -q "android-project-v4.zip" -d appsrc
+          unzip -q "android-project-v5.zip" -d appsrc
 
-      - name: Verify v4 source
+      - name: Verify v5 source
         run: |
-          grep -q 'versionCode 4' appsrc/app/build.gradle
+          grep -q 'versionCode 5' appsrc/app/build.gradle
           grep -q 'public String geminiGenerate' appsrc/app/src/main/java/com/aitaskplanner/app/MainActivity.java
-          grep -q '빌드 Android v4 · Gemini 네이티브 연결판' appsrc/app/src/main/assets/index.html
+          grep -q '빌드 Android v5 · DB/Gemini 통합 수정판' appsrc/app/src/main/assets/index.html
 
       - name: Keep signing key
         uses: actions/cache@v4
@@ -52,9 +53,13 @@ jobs:
         working-directory: appsrc
         run: gradle --no-daemon assembleDebug
 
+      - name: Verify APK
+        run: |
+          test -f appsrc/app/build/outputs/apk/debug/app-debug.apk
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Task-Planner-v4-APK
+          name: AI-Task-Planner-v5-APK
           path: appsrc/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
