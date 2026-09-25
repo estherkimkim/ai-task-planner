@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android APK v3
 
 on:
   workflow_dispatch:
@@ -34,43 +34,80 @@ jobs:
           mkdir appsrc
           unzip -q "android-project (1).zip" -d appsrc
 
-      - name: Fix Android app
+      - name: Fix app source
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           html = Path("appsrc/app/src/main/assets/index.html")
           s = html.read_text(encoding="utf-8")
 
-          old = "$('#toggleCompleted').textContent=state.completedExpanded?'접기':`완료된 항목 ${Math.max(0,done.length-4)}개 더 보기`};syncAndroidNotifications(a)"
-          new = "$('#toggleCompleted').textContent=state.completedExpanded?'접기':`완료된 항목 ${Math.max(0,done.length-4)}개 더 보기`;syncAndroidNotifications(a)}"
-          if old not in s:
-              raise SystemExit("render 수정 대상 코드를 찾지 못했습니다.")
-          s = s.replace(old, new)
+          bad = "$('#toggleCompleted').textContent=state.completedExpanded?'접기':`완료된 항목 ${Math.max(0,done.length-4)}개 더 보기`};syncAndroidNotifications(a)"
+          good = "$('#toggleCompleted').textContent=state.completedExpanded?'접기':`완료된 항목 ${Math.max(0,done.length-4)}개 더 보기`;syncAndroidNotifications(a)}"
+
+          if bad in s:
+              s = s.replace(bad, good)
+          elif good not in s:
+              raise SystemExit("render 수정 지점을 찾지 못했습니다.")
+
+          s = s.replace(
+              '<button class="btn ghost" id="toggleGeminiSettings" type="button">설정</button>',
+              '<button class="btn ghost" id="toggleGeminiSettings" type="button" style="display:none">설정</button>'
+          )
 
           s = s.replace(
               '<div id="geminiSettingsBody" style="display:none;margin-top:12px">',
               '<div id="geminiSettingsBody" style="display:block;margin-top:12px">'
           )
 
+          s = s.replace(
+              '빌드 Android v1 · 지속 알림 통합판',
+              '빌드 Android v3 · 설정 오류 수정 완료'
+          )
+
+          html.write_text(s, encoding="utf-8")
+
           main = Path("appsrc/app/src/main/java/com/aitaskplanner/app/MainActivity.java")
           m = main.read_text(encoding="utf-8")
+
           needle = "settings.setAllowFileAccess(true);"
+          extra = "\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);"
+
           if "setAllowUniversalAccessFromFileURLs(true)" not in m:
-              m = m.replace(
-                  needle,
-                  needle + "\n        settings.setAllowFileAccessFromFileURLs(true);\n        settings.setAllowUniversalAccessFromFileURLs(true);"
-              )
+              if needle not in m:
+                  raise SystemExit("WebView 설정 지점을 찾지 못했습니다.")
+              m = m.replace(needle, needle + extra)
+
           main.write_text(m, encoding="utf-8")
 
           gradle = Path("appsrc/app/build.gradle")
           g = gradle.read_text(encoding="utf-8")
-          g = g.replace("versionCode 1", "versionCode 2")
-          g = g.replace('versionName "1.0"', 'versionName "2.0"')
+          g = re.sub(r'versionCode\s+\d+', 'versionCode 3', g)
+          g = re.sub(r'versionName\s+"[^"]+"', 'versionName "3.0"', g)
           gradle.write_text(g, encoding="utf-8")
           PY
 
-      - name: Keep debug signing key for future updates
+      - name: Verify fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          s = Path("appsrc/app/src/main/assets/index.html").read_text(encoding="utf-8")
+
+          assert '빌드 Android v3 · 설정 오류 수정 완료' in s
+          assert 'id="geminiSettingsBody" style="display:block' in s
+          assert 'syncAndroidNotifications(a)}' in s
+          assert "};syncAndroidNotifications(a)" not in s
+
+          scripts = re.findall(r'<script[^>]*>(.*?)</script>', s, flags=re.S|re.I)
+          Path("/tmp/app.js").write_text("\n".join(scripts), encoding="utf-8")
+          PY
+
+          node --check /tmp/app.js
+
+      - name: Keep signing key
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
@@ -86,5 +123,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: AI-Task-Planner-v2-APK
+          name: AI-Task-Planner-v3-APK
           path: appsrc/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
